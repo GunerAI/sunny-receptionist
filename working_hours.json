@@ -1,0 +1,26 @@
+{
+  "timezone": "America/New_York",
+  "slot_interval_minutes": 30,
+  "weekly_hours": {
+    "Mon": [
+      "09:00-17:00"
+    ],
+    "Tue": [
+      "09:00-17:00"
+    ],
+    "Wed": [
+      "09:00-17:00"
+    ],
+    "Thu": [
+      "09:00-17:00"
+    ],
+    "Fri": [
+      "09:00-17:00"
+    ],
+    "Sat": [
+      "10:00-14:00"
+    ],
+    "Sun": []
+  },
+  "exceptions": {}
+}

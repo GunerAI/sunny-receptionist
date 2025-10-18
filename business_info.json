@@ -1,0 +1,15 @@
+{
+    "Business Name": "Sunny Scissors",
+    "Address": "123 Market St, Greensboro, NC 27401",
+    "Phone": "+1 (336) 555-0199",
+    "Email": "hello@sunnyscissors.com",
+    "Timezone": "America/New_York",
+    "Policies": {
+      "Cancellation": "Please notify us 24 hours in advance.",
+      "Late Arrival": "Arrivals >10 minutes may need to be rescheduled.",
+      "Payment": "Visa/Mastercard/Amex, Cash, and Tap-to-Pay accepted."
+    },
+    "Announcements": [
+      "Fall Promo: 10% off color services this week!"
+    ]
+  }

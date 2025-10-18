@@ -1,0 +1,17 @@
+{
+  "bookings": [
+    {
+      "date": "2025-10-18",
+      "start": "12:30",
+      "end": "13:00",
+      "service": "Basic Haircut",
+      "duration_minutes": 30,
+      "client": {
+        "name": "Mike Mikeey",
+        "phone": "675",
+        "email": "somethingemail"
+      },
+      "created_at": "2025-10-17T21:25:32.931045-04:00"
+    }
+  ]
+}

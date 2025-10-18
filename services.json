@@ -1,0 +1,22 @@
+{
+  "services": [
+    {
+      "name": "Basic Haircut",
+      "duration": 30,
+      "price": 30.0,
+      "description": "A classic cut and simple styling."
+    },
+    {
+      "name": "Skin Fade",
+      "duration": 45,
+      "price": 45.0,
+      "description": "Tight fade with clean transitions."
+    },
+    {
+      "name": "Beard Trim",
+      "duration": 20,
+      "price": 20.0,
+      "description": "Shape and trim with line cleanup."
+    }
+  ]
+}
