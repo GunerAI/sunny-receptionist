@@ -49,7 +49,7 @@ Create a `.env` file (or set Streamlit *Secrets*):
 
 ```env
 OPENAI_API_KEY=sk-...           # required
-OPENAI_MODEL=gpt-4o-mini        # optional override
+OPENAI_MODEL=gpt-5-chat-latest        # optional override
 ADMIN_USERNAME=owner            # optional
 ADMIN_PASSWORD=changeme         # optional
 BUSINESS_INFO_FILE=business_info.json
@@ -196,81 +196,6 @@ Each editor provides **Validate**, **Save**, **Reload**, and **Download** action
 
 ---
 
-## 📦 GitHub: Repo Setup & Push
-
-Below are ready‑to‑run commands. Run them from the project root (where `app.py` lives).
-
-### Option A — Using GitHub CLI (`gh`)
-
-```bash
-# 1) Initialize git
-git init
-
-# 2) Ignore local-only files
-cat > .gitignore << 'EOF'
-# Python
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-.venv/
-venv/
-.env
-
-# Streamlit
-.streamlit/
-
-# OS
-.DS_Store
-Thumbs.db
-EOF
-
-# 3) Create a README from this document if you haven't saved it yet
-# (Skip if README.md already exists)
-[ -f README.md ] || printf "# Sunny Receptionist\n\nSee README in repo." > README.md
-
-# 4) Commit
-git add .
-git commit -m "Initial commit: Sunny Receptionist app"
-
-# 5) Create and push repo
-gh repo create sunny-receptionist --source=. --public --remote=origin --push
-```
-
-### Option B — Using plain Git (create repo on GitHub web UI)
-
-```bash
-# 1) Initialize and commit locally
-git init
-cat > .gitignore << 'EOF'
-__pycache__/
-*.pyc
-.venv/
-.env
-.streamlit/
-.DS_Store
-Thumbs.db
-EOF
-
-git add .
-git commit -m "Initial commit: Sunny Receptionist app"
-
-# 2) Create an empty repo on GitHub (e.g., https://github.com/<you>/sunny-receptionist)
-# 3) Add remote and push
-git branch -M main
-git remote add origin https://github.com/<your-username>/sunny-receptionist.git
-git push -u origin main
-```
-
-> **Tip**: If you prefer SSH remotes:
->
-> ```bash
-> git remote add origin git@github.com:<your-username>/sunny-receptionist.git
-> git push -u origin main
-> ```
-
----
-
 ## ☁️ Deploy (Streamlit Community Cloud)
 
 1. Push the repo to GitHub.
@@ -300,20 +225,4 @@ furnished to do so, subject to the following conditions:
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND...
 ```
-
----
-
-## ✅ Next Steps
-
-- Edit `business_info.json`, `services.json`, and `working_hours.json` from the **Admin** sidebar.
-- Add a `requirements.txt` (example):
-  ```
-  streamlit
-  openai>=1.40
-  python-dotenv
-  langsmith
-  ```
-- Commit and push using one of the options above.
-
-Happy shipping! 💇‍♀️✨
 
