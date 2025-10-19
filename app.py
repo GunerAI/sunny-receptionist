@@ -4,7 +4,7 @@ import os
 import json
 from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime, timedelta
-
+import re
 import streamlit as st
 from dotenv import load_dotenv
 
@@ -45,7 +45,7 @@ st.set_page_config(page_title="Sunny Receptionist", page_icon="💇‍♀️", l
 load_dotenv()  # allow local .env for dev
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY") or st.secrets.get("OPENAI_API_KEY", None)
-MODEL = os.getenv("OPENAI_MODEL") or st.secrets.get("OPENAI_MODEL", "gpt-5-chat-latest")
+MODEL = os.getenv("OPENAI_MODEL") or st.secrets.get("OPENAI_MODEL", "gpt-4o-mini")
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME") or st.secrets.get("ADMIN_USERNAME", "owner")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD") or st.secrets.get("ADMIN_PASSWORD", "changeme")
 
@@ -119,9 +119,10 @@ You are “Sunny,” a friendly, quick, and helpful AI receptionist for a neighb
 1) For opening/closing hours questions: call `get_hours` for the date (and `get_now` if you need to resolve “today/tomorrow”).
 2) On any availability request: call `get_now` (when needed) then `check_availability`.
 3) Only offer a small set of slots (3–8) and a next step.
-4) When booking, summarize: service, date, time, duration, total price (if known). Collect name, phone, email. Then call `book_appointment`.
-5) If a slot becomes unavailable, apologize, show new options.
-6) Never store sensitive data beyond name/phone/email.
+4) When collecting contact info, ask for phone in +1XXXXXXXXXX format and email like name@example.com.
+5) When booking, summarize: service, date, time, duration, total price (if known). Collect name, phone, email. Then call `book_appointment`.
+6) If a slot becomes unavailable, apologize, show new options.
+7) Never store sensitive data beyond name/phone/email.
 
 ## What the local files contain
 - business_info.json: Business Name, Address, Phone, Email, Timezone, Policies, Announcements. (🚫 No working hours or services here.)
@@ -449,6 +450,77 @@ def _normalize_time_to_hhmm(s: str) -> Optional[str]:
     return f"{h:02d}:{m:02d}"
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Contact normalization & validation (centralized)
+# ─────────────────────────────────────────────────────────────────────────────
+
+# E.164: +[1-9][0-9]{1,14}
+_E164_RE = re.compile(r'^\+[1-9]\d{1,14}$')
+
+# A pragmatic, robust email regex (case-insensitive), disallows leading/trailing dot in local part,
+# allows standard characters, and requires a valid-looking domain with TLD 2-63 chars.
+_EMAIL_RE = re.compile(
+    r"(?i)^(?!\.)[a-z0-9._%+\-]{1,64}(?<!\.)@([a-z0-9\-]+\.)+[a-z]{2,63}$"
+)
+
+def normalize_phone(raw: str, default_region: str = "US") -> Optional[str]:
+    """
+    Normalize phone into E.164 string.
+    Rules:
+      - Keep digits only (and leading '+').
+      - If it starts with '+', validate directly as E.164.
+      - If no '+':
+          * For US default: accept 10-digit NANP -> +1XXXXXXXXXX
+            Also accept 11 digits starting with '1' -> +1XXXXXXXXXX
+          * Otherwise, return None (we only auto-normalize US without a country code).
+    Returns:
+      E.164 phone like '+13365551212' or None if cannot normalize.
+    """
+    if not raw:
+        return None
+    s = str(raw).strip()
+
+    # Preserve a single leading '+'; strip other non-digits
+    if s.startswith('+'):
+        digits = '+' + re.sub(r'\D', '', s[1:])
+    else:
+        digits = re.sub(r'\D', '', s)
+
+    # If already has '+', just validate E.164
+    if digits.startswith('+'):
+        return digits if _E164_RE.match(digits) else None
+
+    # No '+': apply default region logic (US)
+    if default_region.upper() == "US":
+        # 11 digits starting with 1
+        if len(digits) == 11 and digits[0] == '1':
+            candidate = f"+{digits}"
+            return candidate if _E164_RE.match(candidate) else None
+        # 10 digits -> assume +1
+        if len(digits) == 10:
+            candidate = f"+1{digits}"
+            return candidate if _E164_RE.match(candidate) else None
+
+    # If we reach here, we can't confidently normalize
+    return None
+
+def validate_phone(e164_phone: str) -> bool:
+    """Validate that a phone is strictly E.164."""
+    return bool(_E164_RE.match(e164_phone or ""))
+
+def normalize_email(raw: str) -> Optional[str]:
+    """
+    Lowercase local and domain; trim surrounding whitespace.
+    (Does not punycode IDNs; assumes standard ASCII domains.)
+    """
+    if not raw:
+        return None
+    return str(raw).strip().lower()
+
+def validate_email(email: str) -> bool:
+    """Validate email with a robust, pragmatic regex."""
+    return bool(_EMAIL_RE.match(email or ""))
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Booking helpers
 # ─────────────────────────────────────────────────────────────────────────────
 def _append_booking_record(date_str: str, start_hhmm: str, end_hhmm: str,
@@ -685,6 +757,15 @@ def book_appointment(date_str: str,
     cleaned_date, _ = extract_daypart(date_str)
     date_str = cleaned_date or date_str
 
+    # 🔒 NEW: normalize & validate contact info (single accepted formats)
+    phone_norm = normalize_phone(phone, default_region="US")
+    if not phone_norm or not validate_phone(phone_norm):
+        return {"success": False, "error": "Please enter a valid phone number in E.164 format, e.g., +13365551212."}
+
+    email_norm = normalize_email(email)
+    if not email_norm or not validate_email(email_norm):
+        return {"success": False, "error": "Please enter a valid email address like name@example.com."}
+
     start_time_norm = _normalize_time_to_hhmm(start_time)
     if not start_time_norm:
         return {"success": False, "error": "Please enter time as HH:MM (e.g., 09:00 or 1:30 pm)."}
@@ -706,7 +787,7 @@ def book_appointment(date_str: str,
         }
 
     ok, msg = _append_appointment(avail["date"], start_time_norm, duration_min,
-                                  client_name, phone, email)
+                                  client_name, phone_norm, email_norm)  # ← store normalized
     if not ok:
         fresh = check_availability(date_phrase=avail["date"], service_name=service_name, limit=8)
         return {
@@ -720,7 +801,7 @@ def book_appointment(date_str: str,
 
     end_time = _minutes_to_time(_time_to_minutes(start_time_norm) + duration_min)
     _append_booking_record(avail["date"], start_time_norm, end_time, service_name, duration_min,
-                           client_name, phone, email)
+                           client_name, phone_norm, email_norm)  # ← store normalized
     return {
         "success": True,
         "message": "Your appointment is confirmed!",
