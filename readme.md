@@ -62,9 +62,9 @@ You can use a `.env` file or `.streamlit/secrets.toml`.
 
 ```env
 OPENAI_API_KEY = "sk-your-key"
-OPENAI_MODEL = "gpt-4o-mini"
+OPENAI_MODEL = "gpt-5-chat-latest"
 ADMIN_USERNAME = "owner"
-ADMIN_PASSWORD = "changeme"
+ADMIN_PASSWORD = "pass1"
 
 BUSINESS_INFO_FILE = "business_info.json"
 SERVICES_FILE      = "services.json"
