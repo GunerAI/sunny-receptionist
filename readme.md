@@ -49,10 +49,6 @@ venv\Scripts\activate
 ```bash
 pip install -r requirements.txt
 ```
-If no `requirements.txt` exists:
-```bash
-pip install streamlit python-dotenv "openai>=1.40"
-```
 
 ---
 
