@@ -1,83 +1,75 @@
-# Sunny Receptionist
+# 💇‍♀️ Sunny Receptionist — AI Salon Booking App
 
-An AI‑powered salon receptionist built with **Streamlit** and **OpenAI Chat Completions**. It handles multi‑turn booking conversations, checks working hours and existing appointments, and writes confirmed bookings to JSON for an owner dashboard.
+An AI-powered, tool-using receptionist for a neighborhood salon. Sunny chats with customers, answers hour/price questions, checks availability, and books appointments into JSON-backed files — all with a clear, safe conversation loop.
 
----
-
-## ✨ Features
-
-- Friendly, multi‑step **conversation loop** (service → date → time → client info → confirm).
-- **Tool‑calling** orchestration for: business info, services, hours, availability, booking, and conversation state.
-- Timezone‑aware scheduling; supports natural dates (e.g., *tomorrow afternoon*).
-- Availability computed from `working_hours.json` + **exceptions** + `calendar.json` collisions.
-- **Admin dashboard** with JSON editors: Business Info, Services, Hours & Dates, Calendar, Bookings.
-- **Separate data files** (business info vs. working hours vs. services), clean persistence layer.
-- Optional **LangSmith** tracing (safe shim if not installed).
+> **Tech**: Streamlit • OpenAI Chat Completions • Function tools • LangSmith tracing (optional) • JSON data sources
 
 ---
 
-## 🗂️ Project Structure
+## Table of Contents
 
-```
-.
-├── app.py                   # Streamlit app (main)
-├── business_info.json       # Name, address, phone, email, timezone, policies, announcements
-├── services.json            # Services catalog (name, duration, price, description)
-├── working_hours.json       # Timezone, slot interval, weekly hours, exceptions
-├── calendar.json            # Existing appointments { "YYYY-MM-DD": ["HH:MM-HH:MM", ...] }
-├── bookings.json            # Booked clients (name, phone, email) per appointment
-├── .env                     # (optional, local dev) API keys and admin creds
-├── .gitignore
-└── README.md
-```
-
-> On first run, the app **seeds** missing JSON files with safe defaults.
-
----
-
-## 🚀 Quick Start
-
-### 1) Prerequisites
-
-- Python **3.9+** (uses `zoneinfo`)
-- `pip install -r requirements.txt` *(or)* `pip install streamlit openai python-dotenv`
-- An **OpenAI API key** with access to your chosen model
-
-### 2) Environment
-
-Create a `.env` file (or set Streamlit *Secrets*):
-
-```env
-OPENAI_API_KEY=sk-...           # required
-OPENAI_MODEL=gpt-5-chat-latest        # optional override
-ADMIN_USERNAME=owner            # optional
-ADMIN_PASSWORD=changeme         # optional
-BUSINESS_INFO_FILE=business_info.json
-SERVICES_FILE=services.json
-WORKING_HOURS_FILE=working_hours.json
-CALENDAR_FILE=calendar.json
-BOOKINGS_FILE=bookings.json
-
-# Optional: LangSmith tracing
-LANGCHAIN_TRACING_V2=false
-LANGCHAIN_API_KEY=
-LANGCHAIN_PROJECT=Sunny Receptionist
-LANGSMITH_ENDPOINT=
-```
-
-### 3) Run the app
-
-```bash
-streamlit run app.py
-```
-
-Then open the URL Streamlit prints in your terminal.
+- [Features](#features)
+- [Architecture](#architecture)
+- [Data Files](#data-files)
+- [Validation & Normalization](#validation--normalization)
+- [Setup](#setup)
+- [Run Locally](#run-locally)
+- [Admin Dashboard](#admin-dashboard)
+- [Conversation Flow](#conversation-flow)
+- [LangSmith Tracing](#langsmith-tracing)
+- [Troubleshooting](#troubleshooting)
+- [Security Notes](#security-notes)
+- [Roadmap](#roadmap)
+- [License](#license)
 
 ---
 
-## ⚙️ Configuration Files
+## Features
 
-### `business_info.json` *(no hours/services here)*
+- **Conversational Receptionist.** Friendly, concise chat that’s easy for non‑native speakers.
+- **Deterministic Conversation Loop.** Collects in order → service → date → start time → name/phone/email → confirm & book.
+- **Accurate Hours & Availability.** Reads `working_hours.json` (+ `exceptions`) and removes conflicts using `calendar.json`.
+- **Reliable Booking.** Re‑checks availability and writes a time block to `calendar.json`; stores contact details in `bookings.json`.
+- **Contact Hygiene.** Phone normalized to **E.164** (e.g., `+13365551212`), emails lowercased and validated with a pragmatic regex.
+- **Natural Dates & Dayparts.** Understands phrases like “tomorrow afternoon,” “next Tue,” `MM/DD`, `YYYY-MM-DD`.
+- **Owner Admin Panel.** JSON editors with validate/save/download for each file.
+- **Optional Tracing.** LangSmith integration to inspect tool calls and model reasoning steps (via a hidden planning tool).
+
+---
+
+## Architecture
+
+**UI:** Streamlit chat + sidebar admin
+
+**Model:** OpenAI Chat Completions with tool calling
+
+\*\*Core tools (functions):
+
+- `get_business_info` — from `business_info.json`
+- `get_services` — from `services.json`
+- `get_now` — current time in salon timezone
+- `get_hours` — opening/closing for a date (weekly + exceptions)
+- `check_availability` — free start times (slot expansion – collisions – filters)
+- `book_appointment` — re-check + write to `calendar.json` and append to `bookings.json`
+- `get_conversation_state` / `update_conversation_state` — slot state in session
+- `normalize_and_store_date` — normalize natural date → `YYYY-MM-DD`
+- `internal_plan` — **hidden** planning tool (not shown to the user)
+
+**Slot Expansion Logic:**
+
+1. Expand daily opening ranges into start slots at `slot_interval_minutes` (default 15).
+2. Ensure a full service duration fits before closing.
+3. Subtract collisions found in `calendar.json` (e.g., `10:00-10:30`).
+4. Filter by **daypart** if requested (e.g., afternoon 12:00–16:59).
+5. If date is today, remove any slot whose end time is in the past.
+
+---
+
+## Data Files
+
+The app seeds files if missing. All paths are configurable via env vars.
+
+### `business_info.json` (no hours/services here)
 
 ```json
 {
@@ -119,7 +111,8 @@ Then open the URL Streamlit prints in your terminal.
     "Sun": []
   },
   "exceptions": {
-    "2025-12-25": []
+    "2025-12-25": [],
+    "2025-12-31": ["09:00-13:00"]
   }
 }
 ```
@@ -129,7 +122,7 @@ Then open the URL Streamlit prints in your terminal.
 ```json
 {
   "appointments": {
-    "2025-10-18": ["10:00-10:30", "11:00-11:45"]
+    "2025-10-18": ["10:00-10:30", "11:30-12:00"]
   }
 }
 ```
@@ -141,12 +134,12 @@ Then open the URL Streamlit prints in your terminal.
   "bookings": [
     {
       "date": "2025-10-18",
-      "start": "11:00",
-      "end": "11:45",
-      "service": "Skin Fade",
-      "duration_minutes": 45,
-      "client": {"name": "Jane Doe", "phone": "+1-555-0100", "email": "jane@example.com"},
-      "created_at": "2025-10-17T21:42:00-04:00"
+      "start": "10:00",
+      "end": "10:30",
+      "service": "Basic Haircut",
+      "duration_minutes": 30,
+      "client": {"name": "Jane Doe", "phone": "+13365551212", "email": "jane@example.com"},
+      "created_at": "2025-10-17T20:10:00-04:00"
     }
   ]
 }
@@ -154,75 +147,163 @@ Then open the URL Streamlit prints in your terminal.
 
 ---
 
-## 🧠 Conversation & Tools (built‑in)
+## Validation & Normalization
 
-- `get_business_info`, `get_services`, `get_now`, `get_hours`
-- `check_availability` → expands slots from working hours + filters collisions from `calendar.json`; respects service duration, dayparts, and "today" cutoff.
-- `book_appointment` → re‑checks availability and writes to `calendar.json` + `bookings.json`.
-- `get_conversation_state` / `update_conversation_state` / `normalize_and_store_date`
-- Hidden `internal_plan` to keep reasoning out of user replies.
-
----
-
-## 🔐 Admin Dashboard
-
-In the sidebar → **Owner/Admin** → sign in (credentials from env or defaults). Tabs:
-
-- **🏪 Business Info** – edit `business_info.json`
-- **💈 Services** – edit `services.json`
-- **🗓 Hours & Dates** – edit `working_hours.json`
-- **📅 Calendar** – edit `calendar.json`
-- **👤 Bookings** – view/download `bookings.json`
-
-Each editor provides **Validate**, **Save**, **Reload**, and **Download** actions.
+- **Phone:** accepted format is strictly **E.164**, e.g., `+13365551212`.
+  - US inputs without `+1` (10 or 11 digits) are auto-normalized to E.164 when possible.
+- **Email:** lowercased and validated with a robust regex (no leading/trailing dot in local part; domain requires TLD 2–63 chars).
+- **Time:** flexible inputs (`9`, `9:00`, `1:30 pm`, `13`, `13:45`) normalized to `HH:MM` 24‑hour.
+- **Date:** `YYYY-MM-DD`, `MM/DD`, weekday names, `today`/`tomorrow`, and `next Tue` supported; dayparts recognized.
 
 ---
 
-## 🧪 Development Tips
+## Setup
 
-- The app seeds JSON if missing. Safe to delete a file and re‑run.
-- Caching: uses `@st.cache_data`. After editing files, code calls `st.cache_data.clear()` to refresh.
-- Time parsing: liberal input normalization (e.g., `1:30 pm` → `13:30`).
-- Date parsing: supports `YYYY-MM-DD`, `MM/DD`, weekdays, `today`, `tomorrow`, and `next <weekday>`.
+1. **Python 3.9+** (requires `zoneinfo`).
+2. Install deps:
+   ```bash
+   pip install streamlit openai>=1.40 python-dotenv
+   # optional for tracing
+   pip install langsmith
+   ```
+3. Create a `.env` (or use Streamlit secrets) with:
+   ```bash
+   OPENAI_API_KEY=sk-...
+   OPENAI_MODEL=gpt-4o-mini
+   ADMIN_USERNAME=owner
+   ADMIN_PASSWORD=changeme
 
----
+   # Optional: LangSmith
+   LANGCHAIN_TRACING_V2=true
+   LANGCHAIN_API_KEY=lsv2_...
+   LANGCHAIN_PROJECT=Sunny Receptionist
+   # LANGSMITH_ENDPOINT=https://api.smith.langchain.com  # optional override
+   ```
 
-## 🛠️ Troubleshooting
+**Configurable file paths** (optional):
 
-- **Missing API Key**: set `OPENAI_API_KEY` in `.env` or Streamlit **Secrets**.
-- **Duplicate button ID**: give each Streamlit button a unique `key` (the app already scopes keys via prefixes per JSON file tab).
-- **Model errors**: verify `OPENAI_MODEL` is available to your API key.
-- **Wrong hours/availability**: check `working_hours.json` `weekly_hours` vs `exceptions`; ensure the salon timezone matches your intent.
-
----
-
-## ☁️ Deploy (Streamlit Community Cloud)
-
-1. Push the repo to GitHub.
-2. In Streamlit Cloud → **New app** → select repo/branch and `app.py` as the entrypoint.
-3. Set **Secrets**:
-   - `OPENAI_API_KEY: sk-...`
-   - (optional) `OPENAI_MODEL`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `LANGCHAIN_TRACING_V2`, `LANGCHAIN_API_KEY`, etc.
-4. Deploy.
-
----
-
-## 📄 License
-
-Choose a license (e.g., MIT). Example `LICENSE`:
-
+```bash
+BUSINESS_INFO_FILE=business_info.json
+SERVICES_FILE=services.json
+WORKING_HOURS_FILE=working_hours.json
+CALENDAR_FILE=calendar.json
+BOOKINGS_FILE=bookings.json
 ```
-MIT License
 
-Copyright (c) 2025 <Your Name>
+---
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+## Run Locally
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND...
+```bash
+streamlit run app.py
 ```
+
+Open the URL shown (usually [http://localhost:8501](http://localhost:8501)). The app seeds missing JSON files with sensible defaults.
+
+---
+
+## Admin Dashboard
+
+Open the **Owner/Admin** section in the sidebar, sign in with `ADMIN_USERNAME` / `ADMIN_PASSWORD`.
+
+- **Business Info:** Edit basic store metadata.
+- **Services:** Define names, durations (minutes), and prices.
+- **Hours & Dates:** Configure weekly hours, slot interval, and date-specific exceptions.
+- **Calendar:** Inspect/modify time blocks per date (`"HH:MM-HH:MM"`).
+- **Bookings:** Read‑only table of bookings with client contact (downloadable).
+
+> After saving JSON files, the app clears caches. You can click **Reload** if needed.
+
+---
+
+## Conversation Flow
+
+1. **User intent → Service** (Sunny may list services with bullets.)
+2. **Date** (accepts natural phrases; internally normalized to `YYYY-MM-DD`).
+3. **Time** (offers 3–8 options; excludes collisions and past‑ending slots).
+4. **Contact** (name, E.164 phone, email).
+5. **Confirm & Book** (writes to `calendar.json` and `bookings.json`).
+6. **Receipt** (summarizes service, date, time, duration, price if known).
+
+**Examples**
+
+- “What time do you close tomorrow?” → `get_hours("tomorrow")`
+- “Basic Haircut tomorrow afternoon” → `check_availability` with daypart → collect contact → `book_appointment`.
+
+---
+
+## LangSmith Tracing
+
+**Public example trace:** [https://smith.langchain.com/public/3e9e2377-7f2d-4dca-9fb0-92bf45056b63/r](https://smith.langchain.com/public/3e9e2377-7f2d-4dca-9fb0-92bf45056b63/r)
+
+**Enable tracing:**
+
+1. `pip install langsmith`
+2. Set in `.env`:
+   ```bash
+   LANGCHAIN_TRACING_V2=true
+   LANGCHAIN_API_KEY=lsv2_...
+   LANGCHAIN_PROJECT=Sunny Receptionist
+   ```
+3. Run the app and chat. You’ll see runs (including tool calls) appear under the project.
+
+**Notes:**
+
+- Tracing is gated behind `HAS_LANGSMITH` and `LANGCHAIN_TRACING_V2=true`.
+- If you don’t see runs, confirm the API key and ensure the package is installed in the same environment where Streamlit runs.
+
+---
+
+## Troubleshooting
+
+**Hours seem wrong**
+
+- Check `working_hours.json` **timezone** and the app’s `business_info.json` `Timezone`.
+- Remember: `exceptions` override weekly hours for specific dates.
+
+**“That start time isn’t available.”**
+
+- The slot may have been taken between offering and booking.
+- The **service duration** must fully fit before closing.
+- For **today**, slots whose **end time** is in the past are filtered out.
+
+**Model not responding / API error**
+
+- Verify `OPENAI_API_KEY` and `OPENAI_MODEL`.
+- Reduce chat history length (the app already bounds to 30 turns).
+
+**No LangSmith runs**
+
+- Ensure `pip show langsmith` works in the same interpreter.
+- Confirm `LANGCHAIN_TRACING_V2=true` and `LANGCHAIN_API_KEY`.
+
+**Cache gotchas**
+
+- The app uses `st.cache_data`. After saving JSON, cache is cleared.
+- Use **Reload** in Admin panel if the UI looks stale.
+
+---
+
+## Security Notes
+
+- **PII scope:** Only **name, phone, email** per booking — stored in `bookings.json`.
+- **Minimal retention:** Booking entries include an ISO timestamp; consider external rotation if needed.
+- **Admin auth:** Simple username/password gate — set strong secrets in production.
+- **Validation:** Strict E.164 phones; pragmatic email regex; times normalized to 24h; dates normalized to `YYYY-MM-DD`.
+
+---
+
+## Roadmap
+
+- Service‑specific buffers and cleanup times.
+- Staff calendars / multi‑chair support.
+- ICS email confirmations (MCP + Zapier action).
+- Holiday import & bulk exception editing.
+- Unit tests for slot math and validators.
+
+---
+
+## License
+
+MIT © 2025
 
