@@ -45,9 +45,9 @@ st.set_page_config(page_title="Sunny Receptionist", page_icon="💇‍♀️", l
 load_dotenv()  # allow local .env for dev
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY") or st.secrets.get("OPENAI_API_KEY", None)
-MODEL = os.getenv("OPENAI_MODEL") or st.secrets.get("OPENAI_MODEL", "gpt-4o-mini")
+MODEL = os.getenv("OPENAI_MODEL") or st.secrets.get("OPENAI_MODEL", "gpt-5-chat-latest")
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME") or st.secrets.get("ADMIN_USERNAME", "owner")
-ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD") or st.secrets.get("ADMIN_PASSWORD", "changeme")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD") or st.secrets.get("ADMIN_PASSWORD", "pass1")
 
 BUSINESS_FILE = os.getenv("BUSINESS_INFO_FILE") or "business_info.json"
 SERVICES_FILE = os.getenv("SERVICES_FILE") or "services.json"
